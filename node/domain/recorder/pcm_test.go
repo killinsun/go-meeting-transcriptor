@@ -121,3 +121,20 @@ func TestDetectSpeechExceededLimitation(t *testing.T) {
 		}
 	})
 }
+
+func TestRecord(t *testing.T) {
+	t.Run("Should append a new input", func(t *testing.T) {
+		interval := 3
+		pr := NewPCMRecorder(interval)
+		input := []int16{0, 0, 0, 120, 120, 44, 66, 10, -12, 0, 0, 0, 0, 0, 0, 0}
+		want := input
+
+		pr.record(input)
+
+		got := pr.BufferedContents
+
+		if len(got) != len(want) {
+			t.Errorf("got %v\n, want %v\n\n", got, want)
+		}
+	})
+}

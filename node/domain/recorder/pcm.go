@@ -1,19 +1,36 @@
 package pcm
 
+import (
+	"time"
+
+	"github.com/gordonklaus/portaudio"
+)
+
 type PCMRecorder struct {
-	Interval         int
-	SilentRatio      float32
-	BaseLangCode     string
-	AltLangCodes     []string
-	BufferedContents []int16
-	silentCount      int
+	Interval             int
+	SilentRatio          float32
+	BaseLangCode         string
+	AltLangCodes         []string
+	BufferedContents     []int16
+	recognitionStartTime time.Duration
+	silentCount          int
+	stream               *portaudio.Stream
 }
 
 func NewPCMRecorder(interval int) *PCMRecorder {
 	var pr = &PCMRecorder{
-		Interval: interval,
+		Interval:             interval,
+		recognitionStartTime: -1,
 	}
 	return pr
+}
+
+func (pr *PCMRecorder) record(input []int16) {
+	pr.silentCount = 0
+	if pr.recognitionStartTime == -1 {
+		pr.recognitionStartTime = pr.stream.Time()
+	}
+	pr.BufferedContents = append(pr.BufferedContents, input...)
 }
 
 func (pr *PCMRecorder) detectSilence(input []int16) bool {
