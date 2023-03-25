@@ -2,10 +2,37 @@ package pcm
 
 import (
 	"fmt"
+	"os"
 	"reflect"
+	"sync"
 	"testing"
 	"time"
 )
+
+func TestStart(t *testing.T) {
+	t.Run("Start function should exit when receive a signal", func(t *testing.T) {
+		sig := make(chan os.Signal, 1)
+		filePathCh := make(chan string, 1)
+		var wait sync.WaitGroup
+
+		mockPortAudio := &MockPortAudio{}
+		pr := NewPCMRecorder(mockPortAudio, 3)
+
+		wait.Add(1)
+
+		go func() {
+			time.Sleep(100 * time.Millisecond)
+			sig <- os.Interrupt
+		}()
+
+		err := pr.Start(sig, filePathCh, &wait)
+		if err != nil {
+			t.Errorf("got %v, want nil", err)
+		}
+
+		wait.Wait()
+	})
+}
 
 func TestDetectSilence(t *testing.T) {
 	t.Run("All array items are 0", func(t *testing.T) {
@@ -139,7 +166,7 @@ func TestRecord(t *testing.T) {
 		pr := NewPCMRecorder(mockPortAudio, interval)
 		want := []int16{0, 0, 0, 120, 120, 44, 66, 10, -12, 0, 0, 0, 0, 0, 0, 0}
 
-		pr.record(want)
+		pr.record(want, time.Now().Sub(time.Now()))
 
 		got := pr.BufferedContents
 		if !reflect.DeepEqual(got, want) {
@@ -149,20 +176,46 @@ func TestRecord(t *testing.T) {
 
 }
 
-type MockPortAudio struct{}
+type MockPortAudioStream struct{}
 
-func (*MockPortAudio) Start() error {
+func (*MockPortAudioStream) Close() error {
+	fmt.Println("Close")
+
+	return nil
+}
+
+func (*MockPortAudioStream) Read() error {
+	fmt.Println("Read")
+
+	return nil
+}
+
+func (*MockPortAudioStream) Start() error {
 	fmt.Println("Start")
 
 	return nil
 }
 
-func (*MockPortAudio) Stop() error {
+func (*MockPortAudioStream) Stop() error {
 	fmt.Println("Stop")
 
 	return nil
 }
 
-func (*MockPortAudio) Time() time.Duration {
+func (*MockPortAudioStream) Time() time.Duration {
 	return time.Now().Sub(time.Now())
+}
+
+type MockPortAudio struct{}
+
+func (*MockPortAudio) Initialize() error {
+	return nil
+}
+
+func (*MockPortAudio) Terminate() {
+	return
+}
+
+func (*MockPortAudio) OpenDefaultStream(numInputChannels int, numOutputChannels int, sampleRate float64, framesPerBuffer int, args ...interface{}) (AudioSystemStream, error) {
+	return &MockPortAudioStream{}, nil
 }
