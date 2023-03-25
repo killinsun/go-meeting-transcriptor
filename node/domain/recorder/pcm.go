@@ -13,7 +13,7 @@ import (
 type AudioSystem interface {
 	Initialize() error
 	OpenDefaultStream(numInputChannels int, numOutputChannels int, sampleRate float64, framesPerBuffer int, args ...interface{}) (AudioSystemStream, error)
-	Terminate()
+	Terminate() error
 }
 
 type AudioSystemStream interface {
@@ -34,8 +34,9 @@ func (p *PortAudioSystem) Terminate() error {
 	return portaudio.Terminate()
 }
 
-func (p *PortAudioSystem) OpenDefaultStream(numInputChannels int, numOutputChannels int, sampleRate float64, framesPerBuffer int, args ...interface{}) (*portaudio.Stream, error) {
-	return p.OpenDefaultStream(numInputChannels, numOutputChannels, sampleRate, framesPerBuffer, args...)
+func (p *PortAudioSystem) OpenDefaultStream(numInputChannels int, numOutputChannels int, sampleRate float64, framesPerBuffer int, args ...interface{}) (AudioSystemStream, error) {
+	stream, err := portaudio.OpenDefaultStream(numInputChannels, numOutputChannels, sampleRate, framesPerBuffer, args...)
+	return stream, err
 }
 
 type PCMRecorder struct {
@@ -56,42 +57,6 @@ func NewPCMRecorder(audioSystem AudioSystem, interval int) *PCMRecorder {
 		audioSystem:          audioSystem,
 	}
 	return pr
-}
-
-func (pr *PCMRecorder) initializeAudioStream() (*AudioSystemStream, error) {
-	input := make([]int16, 64)
-	stream, err := pr.audioSystem.OpenDefaultStream(1, 0, 44100, len(input), input)
-	return &stream, err
-}
-
-func (pr *PCMRecorder) processAudioInput(stream AudioSystemStream, filePathCh chan string) {
-	input := make([]int16, 64)
-
-	if err := stream.Read(); err != nil {
-		log.Fatalf("Could not read stream\n%v", err)
-	}
-
-	if !pr.detectSilence(input) {
-		pr.record(input, stream.Time())
-	} else {
-		pr.silentCount++
-	}
-
-	if pr.detectSpeechStopped() || pr.detectSpeechExceededLimitation() {
-		pr.finalizeRecording(filePathCh)
-	}
-
-}
-
-func (pr *PCMRecorder) finalizeRecording(filepathCh chan string) {
-	outputFileName := fmt.Sprintf("_%d.wav", int(pr.recognitionStartTime))
-	fmt.Println(outputFileName)
-	pr.writePCMData(outputFileName, pr.BufferedContents)
-	filepathCh <- outputFileName
-
-	pr.BufferedContents = nil
-	pr.silentCount = 0
-	pr.recognitionStartTime = -1
 }
 
 func (pr *PCMRecorder) Start(sig chan os.Signal, filepathCh chan string, wait *sync.WaitGroup) error {
@@ -120,6 +85,41 @@ loop:
 	}
 
 	return nil
+}
+
+func (pr *PCMRecorder) initializeAudioStream() (*AudioSystemStream, error) {
+	input := make([]int16, 64)
+	stream, err := pr.audioSystem.OpenDefaultStream(1, 0, 44100, len(input), input)
+	return &stream, err
+}
+
+func (pr *PCMRecorder) processAudioInput(stream AudioSystemStream, filePathCh chan string) {
+	input := make([]int16, 64)
+
+	if err := stream.Read(); err != nil {
+		log.Fatalf("Could not read stream\n%v", err)
+	}
+
+	if !pr.detectSilence(input) {
+		pr.record(input, stream.Time())
+	} else {
+		pr.silentCount++
+	}
+
+	if pr.detectSpeechStopped() || pr.detectSpeechExceededLimitation() {
+		pr.finalizeRecording(filePathCh)
+	}
+}
+
+func (pr *PCMRecorder) finalizeRecording(filepathCh chan string) {
+	outputFileName := fmt.Sprintf("_%d.wav", int(pr.recognitionStartTime))
+	fmt.Println(outputFileName)
+	pr.writePCMData(outputFileName, pr.BufferedContents)
+	filepathCh <- outputFileName
+
+	pr.BufferedContents = nil
+	pr.silentCount = 0
+	pr.recognitionStartTime = -1
 }
 
 func (pr *PCMRecorder) record(input []int16, startTime time.Duration) {

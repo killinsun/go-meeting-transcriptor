@@ -212,8 +212,8 @@ func (*MockPortAudio) Initialize() error {
 	return nil
 }
 
-func (*MockPortAudio) Terminate() {
-	return
+func (*MockPortAudio) Terminate() error {
+	return nil
 }
 
 func (*MockPortAudio) OpenDefaultStream(numInputChannels int, numOutputChannels int, sampleRate float64, framesPerBuffer int, args ...interface{}) (AudioSystemStream, error) {
