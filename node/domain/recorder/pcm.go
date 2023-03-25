@@ -58,18 +58,53 @@ func NewPCMRecorder(audioSystem AudioSystem, interval int) *PCMRecorder {
 	return pr
 }
 
+func (pr *PCMRecorder) initializeAudioStream() (*AudioSystemStream, error) {
+	input := make([]int16, 64)
+	stream, err := pr.audioSystem.OpenDefaultStream(1, 0, 44100, len(input), input)
+	return &stream, err
+}
+
+func (pr *PCMRecorder) processAudioInput(stream AudioSystemStream, filePathCh chan string) {
+	input := make([]int16, 64)
+
+	if err := stream.Read(); err != nil {
+		log.Fatalf("Could not read stream\n%v", err)
+	}
+
+	if !pr.detectSilence(input) {
+		pr.record(input, stream.Time())
+	} else {
+		pr.silentCount++
+	}
+
+	if pr.detectSpeechStopped() || pr.detectSpeechExceededLimitation() {
+		pr.finalizeRecording(filePathCh)
+	}
+
+}
+
+func (pr *PCMRecorder) finalizeRecording(filepathCh chan string) {
+	outputFileName := fmt.Sprintf("_%d.wav", int(pr.recognitionStartTime))
+	fmt.Println(outputFileName)
+	pr.writePCMData(outputFileName, pr.BufferedContents)
+	filepathCh <- outputFileName
+
+	pr.BufferedContents = nil
+	pr.silentCount = 0
+	pr.recognitionStartTime = -1
+}
+
 func (pr *PCMRecorder) Start(sig chan os.Signal, filepathCh chan string, wait *sync.WaitGroup) error {
 	pr.audioSystem.Initialize()
 	defer pr.audioSystem.Terminate()
 
-	input := make([]int16, 64)
 	var err error
-	stream, err := pr.audioSystem.OpenDefaultStream(1, 0, 44100, len(input), input)
+	stream, err := pr.initializeAudioStream()
 	if err != nil {
 		log.Fatalf("Could not open default stream \n %v", err)
 	}
-	stream.Start()
-	defer stream.Close()
+	(*stream).Start()
+	defer (*stream).Close()
 
 loop:
 	for {
@@ -81,26 +116,7 @@ loop:
 		default:
 		}
 
-		if err := stream.Read(); err != nil {
-			log.Fatalf("Could not read stream\n%v", err)
-		}
-
-		if !pr.detectSilence(input) {
-			pr.record(input, stream.Time())
-		} else {
-			pr.silentCount++
-		}
-
-		if pr.detectSpeechStopped() || pr.detectSpeechExceededLimitation() {
-			outputFileName := fmt.Sprintf("_%d.wav", int(pr.recognitionStartTime))
-			fmt.Println(outputFileName)
-			// 	pr.writePCMData(outputFileName, pr.Data)
-			// 	filepathCh <- outputFileName
-
-			// 	pr.Data = nil
-			// 	pr.silentCount = 0
-			// 	pr.recognitionStartTime = -1
-		}
+		pr.processAudioInput(*stream, filepathCh)
 	}
 
 	return nil
@@ -132,4 +148,27 @@ func (pr *PCMRecorder) detectSpeechStopped() bool {
 
 func (pr *PCMRecorder) detectSpeechExceededLimitation() bool {
 	return len(pr.BufferedContents) >= (44100 * pr.Interval)
+}
+
+func (pr *PCMRecorder) writePCMData(outputFileName string, pcmData []int16) {
+	if exists(outputFileName) {
+		log.Fatalf("The audio file is already exists.")
+	}
+	file, err := os.Create(outputFileName)
+	if err != nil {
+		log.Fatalf("Could not create a new file to write \n %v", err)
+	}
+	defer func() {
+		if err := file.Close(); err != nil {
+			log.Fatalf("Could not close output file \n %v", err)
+		}
+	}()
+
+	wav := NewWAVEncoder(file, pcmData)
+	wav.Encode()
+}
+
+func exists(fileName string) bool {
+	_, err := os.Stat(fileName)
+	return err == nil
 }
