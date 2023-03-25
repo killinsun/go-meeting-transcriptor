@@ -2,6 +2,7 @@ package pcm
 
 import (
 	"fmt"
+	"reflect"
 	"testing"
 	"time"
 )
@@ -136,10 +137,14 @@ func TestRecord(t *testing.T) {
 		interval := 3
 		mockPortAudio := &MockPortAudio{}
 		pr := NewPCMRecorder(mockPortAudio, interval)
-		pr.BufferedContents = nil
-		input := []int16{0, 0, 0, 120, 120, 44, 66, 10, -12, 0, 0, 0, 0, 0, 0, 0}
+		want := []int16{0, 0, 0, 120, 120, 44, 66, 10, -12, 0, 0, 0, 0, 0, 0, 0}
 
-		pr.record(input)
+		pr.record(want)
+
+		got := pr.BufferedContents
+		if !reflect.DeepEqual(got, want) {
+			t.Errorf("got %v, want %v", got, want)
+		}
 	})
 
 }
