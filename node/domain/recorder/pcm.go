@@ -2,9 +2,13 @@ package pcm
 
 import (
 	"time"
-
-	"github.com/gordonklaus/portaudio"
 )
+
+type PortAudioStreamIF interface {
+	Start() error
+	Stop() error
+	Time() time.Duration
+}
 
 type PCMRecorder struct {
 	Interval             int
@@ -14,13 +18,14 @@ type PCMRecorder struct {
 	BufferedContents     []int16
 	recognitionStartTime time.Duration
 	silentCount          int
-	stream               *portaudio.Stream
+	stream               PortAudioStreamIF
 }
 
-func NewPCMRecorder(interval int) *PCMRecorder {
+func NewPCMRecorder(stream PortAudioStreamIF, interval int) *PCMRecorder {
 	var pr = &PCMRecorder{
 		Interval:             interval,
 		recognitionStartTime: -1,
+		stream:               stream,
 	}
 	return pr
 }
