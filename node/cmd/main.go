@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"io/ioutil"
 	"log"
 	"os"
 	"os/signal"
@@ -16,7 +17,7 @@ import (
 )
 
 var (
-	client transcriptorpb.GreetingServiceClient
+	client transcriptorpb.TranscriptorServiceClient
 )
 
 func main() {
@@ -24,7 +25,7 @@ func main() {
 
 	baseDir := time.Now().Format("audio_20060102_T150405")
 	if err := os.MkdirAll(baseDir, 0755); err != nil {
-		panic("Could not create a new directory")
+		log.Fatal("Could not create a new directory")
 	}
 
 	audioSystem := &pcm.PortAudioSystem{}
@@ -43,7 +44,7 @@ func main() {
 		return
 	}
 	defer conn.Close()
-	client = transcriptorpb.NewGreetingServiceClient(conn)
+	client = transcriptorpb.NewTranscriptorServiceClient(conn)
 
 	sig := make(chan os.Signal, 1)
 	signal.Notify(sig, os.Interrupt, os.Kill)
@@ -58,32 +59,35 @@ func main() {
 		}
 	}()
 
+	wavStream, err := client.StreamWav(context.Background())
+	if err != nil {
+		log.Fatal(err)
+	}
+
 	go func() {
 		for {
 			filePath, ok := <-filePathCh
 			if !ok {
 				break
 			}
-			Hello(filePath)
+			b, err := ioutil.ReadFile(filePath)
+			if err != nil {
+				log.Fatal(err)
+			}
+
+			if err := wavStream.Send(&transcriptorpb.WavChunk{Data: b}); err != nil {
+				log.Fatal(err)
+			}
 		}
 	}()
 
 	<-sig
 	wait.Wait()
 
-	time.Sleep(1 * time.Second)
-	fmt.Println("Streaming finished.")
-}
-
-func Hello(name string) {
-	req := &transcriptorpb.HelloRequest{
-		Name: name,
-	}
-
-	res, err := client.Hello(context.Background(), req)
+	res, err := wavStream.CloseAndRecv()
 	if err != nil {
-		fmt.Println(err)
-	} else {
-		fmt.Println(res.GetMessage())
+		log.Fatalf("Error closing and receiving StreamWav: %v", err)
 	}
+	fmt.Printf("Done: %v\n", res.GetDone())
+	fmt.Println("Streaming finished.")
 }

@@ -18,88 +18,122 @@ import (
 // Requires gRPC-Go v1.32.0 or later.
 const _ = grpc.SupportPackageIsVersion7
 
-// GreetingServiceClient is the client API for GreetingService service.
+// TranscriptorServiceClient is the client API for TranscriptorService service.
 //
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
-type GreetingServiceClient interface {
-	Hello(ctx context.Context, in *HelloRequest, opts ...grpc.CallOption) (*HelloResponse, error)
+type TranscriptorServiceClient interface {
+	StreamWav(ctx context.Context, opts ...grpc.CallOption) (TranscriptorService_StreamWavClient, error)
 }
 
-type greetingServiceClient struct {
+type transcriptorServiceClient struct {
 	cc grpc.ClientConnInterface
 }
 
-func NewGreetingServiceClient(cc grpc.ClientConnInterface) GreetingServiceClient {
-	return &greetingServiceClient{cc}
+func NewTranscriptorServiceClient(cc grpc.ClientConnInterface) TranscriptorServiceClient {
+	return &transcriptorServiceClient{cc}
 }
 
-func (c *greetingServiceClient) Hello(ctx context.Context, in *HelloRequest, opts ...grpc.CallOption) (*HelloResponse, error) {
-	out := new(HelloResponse)
-	err := c.cc.Invoke(ctx, "/goMeetingTranscriptor.GreetingService/Hello", in, out, opts...)
+func (c *transcriptorServiceClient) StreamWav(ctx context.Context, opts ...grpc.CallOption) (TranscriptorService_StreamWavClient, error) {
+	stream, err := c.cc.NewStream(ctx, &TranscriptorService_ServiceDesc.Streams[0], "/goMeetingTranscriptor.TranscriptorService/StreamWav", opts...)
 	if err != nil {
 		return nil, err
 	}
-	return out, nil
+	x := &transcriptorServiceStreamWavClient{stream}
+	return x, nil
 }
 
-// GreetingServiceServer is the server API for GreetingService service.
-// All implementations must embed UnimplementedGreetingServiceServer
-// for forward compatibility
-type GreetingServiceServer interface {
-	Hello(context.Context, *HelloRequest) (*HelloResponse, error)
-	mustEmbedUnimplementedGreetingServiceServer()
+type TranscriptorService_StreamWavClient interface {
+	Send(*WavChunk) error
+	CloseAndRecv() (*WavResponse, error)
+	grpc.ClientStream
 }
 
-// UnimplementedGreetingServiceServer must be embedded to have forward compatible implementations.
-type UnimplementedGreetingServiceServer struct {
+type transcriptorServiceStreamWavClient struct {
+	grpc.ClientStream
 }
 
-func (UnimplementedGreetingServiceServer) Hello(context.Context, *HelloRequest) (*HelloResponse, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method Hello not implemented")
-}
-func (UnimplementedGreetingServiceServer) mustEmbedUnimplementedGreetingServiceServer() {}
-
-// UnsafeGreetingServiceServer may be embedded to opt out of forward compatibility for this service.
-// Use of this interface is not recommended, as added methods to GreetingServiceServer will
-// result in compilation errors.
-type UnsafeGreetingServiceServer interface {
-	mustEmbedUnimplementedGreetingServiceServer()
+func (x *transcriptorServiceStreamWavClient) Send(m *WavChunk) error {
+	return x.ClientStream.SendMsg(m)
 }
 
-func RegisterGreetingServiceServer(s grpc.ServiceRegistrar, srv GreetingServiceServer) {
-	s.RegisterService(&GreetingService_ServiceDesc, srv)
-}
-
-func _GreetingService_Hello_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(HelloRequest)
-	if err := dec(in); err != nil {
+func (x *transcriptorServiceStreamWavClient) CloseAndRecv() (*WavResponse, error) {
+	if err := x.ClientStream.CloseSend(); err != nil {
 		return nil, err
 	}
-	if interceptor == nil {
-		return srv.(GreetingServiceServer).Hello(ctx, in)
+	m := new(WavResponse)
+	if err := x.ClientStream.RecvMsg(m); err != nil {
+		return nil, err
 	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: "/goMeetingTranscriptor.GreetingService/Hello",
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(GreetingServiceServer).Hello(ctx, req.(*HelloRequest))
-	}
-	return interceptor(ctx, in, info, handler)
+	return m, nil
 }
 
-// GreetingService_ServiceDesc is the grpc.ServiceDesc for GreetingService service.
+// TranscriptorServiceServer is the server API for TranscriptorService service.
+// All implementations must embed UnimplementedTranscriptorServiceServer
+// for forward compatibility
+type TranscriptorServiceServer interface {
+	StreamWav(TranscriptorService_StreamWavServer) error
+	mustEmbedUnimplementedTranscriptorServiceServer()
+}
+
+// UnimplementedTranscriptorServiceServer must be embedded to have forward compatible implementations.
+type UnimplementedTranscriptorServiceServer struct {
+}
+
+func (UnimplementedTranscriptorServiceServer) StreamWav(TranscriptorService_StreamWavServer) error {
+	return status.Errorf(codes.Unimplemented, "method StreamWav not implemented")
+}
+func (UnimplementedTranscriptorServiceServer) mustEmbedUnimplementedTranscriptorServiceServer() {}
+
+// UnsafeTranscriptorServiceServer may be embedded to opt out of forward compatibility for this service.
+// Use of this interface is not recommended, as added methods to TranscriptorServiceServer will
+// result in compilation errors.
+type UnsafeTranscriptorServiceServer interface {
+	mustEmbedUnimplementedTranscriptorServiceServer()
+}
+
+func RegisterTranscriptorServiceServer(s grpc.ServiceRegistrar, srv TranscriptorServiceServer) {
+	s.RegisterService(&TranscriptorService_ServiceDesc, srv)
+}
+
+func _TranscriptorService_StreamWav_Handler(srv interface{}, stream grpc.ServerStream) error {
+	return srv.(TranscriptorServiceServer).StreamWav(&transcriptorServiceStreamWavServer{stream})
+}
+
+type TranscriptorService_StreamWavServer interface {
+	SendAndClose(*WavResponse) error
+	Recv() (*WavChunk, error)
+	grpc.ServerStream
+}
+
+type transcriptorServiceStreamWavServer struct {
+	grpc.ServerStream
+}
+
+func (x *transcriptorServiceStreamWavServer) SendAndClose(m *WavResponse) error {
+	return x.ServerStream.SendMsg(m)
+}
+
+func (x *transcriptorServiceStreamWavServer) Recv() (*WavChunk, error) {
+	m := new(WavChunk)
+	if err := x.ServerStream.RecvMsg(m); err != nil {
+		return nil, err
+	}
+	return m, nil
+}
+
+// TranscriptorService_ServiceDesc is the grpc.ServiceDesc for TranscriptorService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
-var GreetingService_ServiceDesc = grpc.ServiceDesc{
-	ServiceName: "goMeetingTranscriptor.GreetingService",
-	HandlerType: (*GreetingServiceServer)(nil),
-	Methods: []grpc.MethodDesc{
+var TranscriptorService_ServiceDesc = grpc.ServiceDesc{
+	ServiceName: "goMeetingTranscriptor.TranscriptorService",
+	HandlerType: (*TranscriptorServiceServer)(nil),
+	Methods:     []grpc.MethodDesc{},
+	Streams: []grpc.StreamDesc{
 		{
-			MethodName: "Hello",
-			Handler:    _GreetingService_Hello_Handler,
+			StreamName:    "StreamWav",
+			Handler:       _TranscriptorService_StreamWav_Handler,
+			ClientStreams: true,
 		},
 	},
-	Streams:  []grpc.StreamDesc{},
 	Metadata: "transcriptor.proto",
 }

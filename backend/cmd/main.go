@@ -1,13 +1,14 @@
 package main
 
 import (
+	"errors"
 	"fmt"
+	"io"
 	"log"
 	"net"
 	"os"
 	"os/signal"
 
-	"golang.org/x/net/context"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/reflection"
 
@@ -24,7 +25,7 @@ func main() {
 
 	s := grpc.NewServer()
 
-	transcriptorpb.RegisterGreetingServiceServer(s, NewGRPCServer())
+	transcriptorpb.RegisterTranscriptorServiceServer(s, NewTranscriptionServer())
 
 	reflection.Register(s)
 
@@ -40,16 +41,25 @@ func main() {
 	s.GracefulStop()
 }
 
-type gRPCServer struct {
-	transcriptorpb.UnimplementedGreetingServiceServer
+type transcriptionServer struct {
+	transcriptorpb.UnimplementedTranscriptorServiceServer
 }
 
-func NewGRPCServer() *gRPCServer {
-	return &gRPCServer{}
+func NewTranscriptionServer() *transcriptionServer {
+	return &transcriptionServer{}
 }
 
-func (g *gRPCServer) Hello(ctx context.Context, req *transcriptorpb.HelloRequest) (*transcriptorpb.HelloResponse, error) {
-	return &transcriptorpb.HelloResponse{
-		Message: fmt.Sprintf("Hello, %s!", req.GetName()),
-	}, nil
+func (t *transcriptionServer) StreamWav(stream transcriptorpb.TranscriptorService_StreamWavServer) error {
+	for {
+		req, err := stream.Recv()
+		if errors.Is(err, io.EOF) {
+			return stream.SendAndClose(&transcriptorpb.WavResponse{
+				Done: true,
+			})
+		}
+		if err != nil {
+			return err
+		}
+		fmt.Printf("Received %d byte\n", len(req.GetData()))
+	}
 }

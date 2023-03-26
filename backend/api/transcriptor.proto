@@ -4,14 +4,14 @@ option go_package ="pkg/grpc";
 
 package goMeetingTranscriptor;
 
-service GreetingService {
-	rpc Hello(HelloRequest) returns (HelloResponse);
+service TranscriptorService {
+	rpc StreamWav(stream WavChunk) returns (WavResponse);
 }
 
-message HelloRequest {
-	string name = 1;
+message WavChunk {
+	bytes data = 1;
 }
 
-message HelloResponse {
-	string message = 1;
+message WavResponse {
+	bool done = 1;
 }
