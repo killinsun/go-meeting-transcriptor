@@ -1,11 +1,14 @@
 package main
 
 import (
+	"errors"
 	"fmt"
+	"io"
 	"log"
 	"net"
 	"os"
 	"os/signal"
+	"time"
 
 	"golang.org/x/net/context"
 	"google.golang.org/grpc"
@@ -52,4 +55,35 @@ func (g *gRPCServer) Hello(ctx context.Context, req *transcriptorpb.HelloRequest
 	return &transcriptorpb.HelloResponse{
 		Message: fmt.Sprintf("Hello, %s!", req.GetName()),
 	}, nil
+}
+
+func (g *gRPCServer) HelloServerStream(req *transcriptorpb.HelloRequest, stream transcriptorpb.GreetingService_HelloServerStreamServer) error {
+	resCount := 5
+
+	for i := 0; i < resCount; i++ {
+		if err := stream.Send(&transcriptorpb.HelloResponse{
+			Message: fmt.Sprintf("[%d]Hello, %s!", i, req.GetName()),
+		}); err != nil {
+			return err
+		}
+		time.Sleep(time.Second * 1)
+	}
+	return nil
+}
+
+func (g *gRPCServer) HelloClientStream(stream transcriptorpb.GreetingService_HelloClientStreamServer) error {
+	nameList := make([]string, 0)
+	for {
+		req, err := stream.Recv()
+		if errors.Is(err, io.EOF) {
+			message := fmt.Sprintf("Hello, %v!", nameList)
+			return stream.SendAndClose(&transcriptorpb.HelloResponse{
+				Message: message,
+			})
+		}
+		if err != nil {
+			return err
+		}
+		nameList = append(nameList, req.GetName())
+	}
 }

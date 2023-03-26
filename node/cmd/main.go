@@ -2,7 +2,9 @@ package main
 
 import (
 	"context"
+	"errors"
 	"fmt"
+	"io"
 	"log"
 	"os"
 	"os/signal"
@@ -58,13 +60,23 @@ func main() {
 		}
 	}()
 
+	stream, err := client.HelloClientStream(context.Background())
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
+
 	go func() {
 		for {
 			filePath, ok := <-filePathCh
 			if !ok {
 				break
 			}
-			Hello(filePath)
+
+			if err := stream.Send(&transcriptorpb.HelloRequest{Name: filePath}); err != nil {
+				fmt.Println(err)
+				return
+			}
 		}
 	}()
 
@@ -72,6 +84,15 @@ func main() {
 	wait.Wait()
 
 	time.Sleep(1 * time.Second)
+
+	res, err := stream.CloseAndRecv()
+	if err != nil {
+		fmt.Println(err)
+	} else {
+		fmt.Println(res.GetMessage())
+	}
+
+	HelloServerStream("Killinsun")
 	fmt.Println("Streaming finished.")
 }
 
@@ -85,5 +106,30 @@ func Hello(name string) {
 		fmt.Println(err)
 	} else {
 		fmt.Println(res.GetMessage())
+	}
+}
+
+func HelloServerStream(name string) {
+	req := &transcriptorpb.HelloRequest{
+		Name: name,
+	}
+
+	stream, err := client.HelloServerStream(context.Background(), req)
+	if err != nil {
+		fmt.Println(err)
+		return
+	}
+
+	for {
+		res, err := stream.Recv()
+		if errors.Is(err, io.EOF) {
+			fmt.Println("All the responses have already received.")
+			break
+		}
+		if err != nil {
+			fmt.Println(err)
+		}
+
+		fmt.Println(res)
 	}
 }

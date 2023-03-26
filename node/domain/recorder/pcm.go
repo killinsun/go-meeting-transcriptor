@@ -80,6 +80,7 @@ func NewPCMRecorder(audioSystem AudioSystem, baseDir string, interval int) *PCMR
 
 func (pr *PCMRecorder) GetDeviceInfo() {
 	pr.audioSystem.Initialize()
+	defer pr.audioSystem.Terminate()
 	pr.audioSystem.GetDeviceInfo()
 }
 
