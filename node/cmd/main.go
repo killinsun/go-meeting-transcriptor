@@ -2,9 +2,8 @@ package main
 
 import (
 	"context"
-	"errors"
 	"fmt"
-	"io"
+	"io/ioutil"
 	"log"
 	"os"
 	"os/signal"
@@ -18,7 +17,7 @@ import (
 )
 
 var (
-	client transcriptorpb.GreetingServiceClient
+	client transcriptorpb.TranscriptorServiceClient
 )
 
 func main() {
@@ -45,7 +44,7 @@ func main() {
 		return
 	}
 	defer conn.Close()
-	client = transcriptorpb.NewGreetingServiceClient(conn)
+	client = transcriptorpb.NewTranscriptorServiceClient(conn)
 
 	sig := make(chan os.Signal, 1)
 	signal.Notify(sig, os.Interrupt, os.Kill)
@@ -60,7 +59,7 @@ func main() {
 		}
 	}()
 
-	stream, err := client.HelloClientStream(context.Background())
+	wavStream, err := client.StreamWav(context.Background())
 	if err != nil {
 		fmt.Println(err)
 		return
@@ -72,8 +71,12 @@ func main() {
 			if !ok {
 				break
 			}
+			b, err := ioutil.ReadFile(filePath)
+			if err != nil {
+				panic(err)
+			}
 
-			if err := stream.Send(&transcriptorpb.HelloRequest{Name: filePath}); err != nil {
+			if err := wavStream.Send(&transcriptorpb.WavChunk{Data: b}); err != nil {
 				fmt.Println(err)
 				return
 			}
@@ -85,51 +88,11 @@ func main() {
 
 	time.Sleep(1 * time.Second)
 
-	res, err := stream.CloseAndRecv()
+	res, err := wavStream.CloseAndRecv()
 	if err != nil {
 		fmt.Println(err)
 	} else {
-		fmt.Println(res.GetMessage())
+		fmt.Println(res.GetDone())
 	}
-
-	HelloServerStream("Killinsun")
 	fmt.Println("Streaming finished.")
-}
-
-func Hello(name string) {
-	req := &transcriptorpb.HelloRequest{
-		Name: name,
-	}
-
-	res, err := client.Hello(context.Background(), req)
-	if err != nil {
-		fmt.Println(err)
-	} else {
-		fmt.Println(res.GetMessage())
-	}
-}
-
-func HelloServerStream(name string) {
-	req := &transcriptorpb.HelloRequest{
-		Name: name,
-	}
-
-	stream, err := client.HelloServerStream(context.Background(), req)
-	if err != nil {
-		fmt.Println(err)
-		return
-	}
-
-	for {
-		res, err := stream.Recv()
-		if errors.Is(err, io.EOF) {
-			fmt.Println("All the responses have already received.")
-			break
-		}
-		if err != nil {
-			fmt.Println(err)
-		}
-
-		fmt.Println(res)
-	}
 }
