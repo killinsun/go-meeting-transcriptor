@@ -16,7 +16,8 @@ func TestStart(t *testing.T) {
 		var wait sync.WaitGroup
 
 		mockPortAudio := &MockPortAudio{}
-		pr := NewPCMRecorder(mockPortAudio, 3)
+		baseDir := time.Now().Format("test_audio_20060102_T150405")
+		pr := NewPCMRecorder(mockPortAudio, baseDir, 3)
 
 		wait.Add(1)
 
@@ -40,7 +41,8 @@ func TestDetectSilence(t *testing.T) {
 
 		interval := 3
 		mockPortAudio := &MockPortAudio{}
-		pr := NewPCMRecorder(mockPortAudio, interval)
+		baseDir := time.Now().Format("test_audio_20060102_T150405")
+		pr := NewPCMRecorder(mockPortAudio, baseDir, interval)
 
 		got := pr.detectSilence(input)
 		want := true
@@ -55,7 +57,8 @@ func TestDetectSilence(t *testing.T) {
 
 		interval := 3
 		mockPortAudio := &MockPortAudio{}
-		pr := NewPCMRecorder(mockPortAudio, interval)
+		baseDir := time.Now().Format("test_audio_20060102_T150405")
+		pr := NewPCMRecorder(mockPortAudio, baseDir, interval)
 
 		got := pr.detectSilence(input)
 		want := false
@@ -70,7 +73,8 @@ func TestDetectSpeechStopped(t *testing.T) {
 	t.Run("Should return true when speech is stopped", func(t *testing.T) {
 		interval := 3
 		mockPortAudio := &MockPortAudio{}
-		pr := NewPCMRecorder(mockPortAudio, interval)
+		baseDir := time.Now().Format("test_audio_20060102_T150405")
+		pr := NewPCMRecorder(mockPortAudio, baseDir, interval)
 		want := true
 
 		contents := make([]int16, 64)
@@ -91,7 +95,8 @@ func TestDetectSpeechStopped(t *testing.T) {
 	t.Run("Should return false when speech continue", func(t *testing.T) {
 		interval := 3
 		mockPortAudio := &MockPortAudio{}
-		pr := NewPCMRecorder(mockPortAudio, interval)
+		baseDir := time.Now().Format("test_audio_20060102_T150405")
+		pr := NewPCMRecorder(mockPortAudio, baseDir, interval)
 		want := false
 
 		contents := make([]int16, 64)
@@ -111,7 +116,8 @@ func TestDetectSpeechStopped(t *testing.T) {
 	t.Run("Should return false when silence was very short", func(t *testing.T) {
 		interval := 3
 		mockPortAudio := &MockPortAudio{}
-		pr := NewPCMRecorder(mockPortAudio, interval)
+		baseDir := time.Now().Format("test_audio_20060102_T150405")
+		pr := NewPCMRecorder(mockPortAudio, baseDir, interval)
 		want := false
 
 		contents := make([]int16, 64)
@@ -133,7 +139,8 @@ func TestDetectSpeechExceededLimitation(t *testing.T) {
 	t.Run("Should return true when speech duration is over an interval", func(t *testing.T) {
 		interval := 3
 		mockPortAudio := &MockPortAudio{}
-		pr := NewPCMRecorder(mockPortAudio, interval)
+		baseDir := time.Now().Format("test_audio_20060102_T150405")
+		pr := NewPCMRecorder(mockPortAudio, baseDir, interval)
 		want := true
 
 		pr.BufferedContents = make([]int16, 44100*pr.Interval)
@@ -147,7 +154,8 @@ func TestDetectSpeechExceededLimitation(t *testing.T) {
 	t.Run("Should return false when speech duration is not over an interval", func(t *testing.T) {
 		interval := 3
 		mockPortAudio := &MockPortAudio{}
-		pr := NewPCMRecorder(mockPortAudio, interval)
+		baseDir := time.Now().Format("test_audio_20060102_T150405")
+		pr := NewPCMRecorder(mockPortAudio, baseDir, interval)
 		want := false
 
 		pr.BufferedContents = make([]int16, 44100*pr.Interval-1)
@@ -163,7 +171,8 @@ func TestRecord(t *testing.T) {
 	t.Run("Should append a new input", func(t *testing.T) {
 		interval := 3
 		mockPortAudio := &MockPortAudio{}
-		pr := NewPCMRecorder(mockPortAudio, interval)
+		baseDir := time.Now().Format("test_audio_20060102_T150405")
+		pr := NewPCMRecorder(mockPortAudio, baseDir, interval)
 		want := []int16{0, 0, 0, 120, 120, 44, 66, 10, -12, 0, 0, 0, 0, 0, 0, 0}
 
 		pr.record(want, time.Now().Sub(time.Now()))
@@ -214,6 +223,10 @@ func (*MockPortAudio) Initialize() error {
 
 func (*MockPortAudio) Terminate() error {
 	return nil
+}
+
+func (*MockPortAudio) GetDeviceInfo() {
+	return
 }
 
 func (*MockPortAudio) OpenDefaultStream(numInputChannels int, numOutputChannels int, sampleRate float64, framesPerBuffer int, args ...interface{}) (AudioSystemStream, error) {

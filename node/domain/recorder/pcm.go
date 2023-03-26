@@ -11,6 +11,7 @@ import (
 )
 
 type AudioSystem interface {
+	GetDeviceInfo()
 	Initialize() error
 	OpenDefaultStream(numInputChannels int, numOutputChannels int, sampleRate float64, framesPerBuffer int, args ...interface{}) (AudioSystemStream, error)
 	Terminate() error
@@ -39,24 +40,47 @@ func (p *PortAudioSystem) OpenDefaultStream(numInputChannels int, numOutputChann
 	return stream, err
 }
 
+func (p *PortAudioSystem) GetDeviceInfo() {
+	devices, err := portaudio.Devices()
+	if err != nil {
+		panic("Could not get devices")
+	}
+
+	fmt.Println("Default device:")
+	fmt.Println(devices[0].HostApi.DefaultInputDevice.Name)
+	fmt.Println(devices[0].HostApi.DefaultOutputDevice.Name)
+	fmt.Println("Devices:")
+	for i := 0; i < len(devices); i++ {
+		fmt.Println(devices[i].Name)
+	}
+}
+
 type PCMRecorder struct {
+	BaseDir              string
 	Interval             int
 	SilentRatio          float32
 	BaseLangCode         string
 	AltLangCodes         []string
 	BufferedContents     []int16
+	Input                []int16
 	recognitionStartTime time.Duration
 	silentCount          int
 	audioSystem          AudioSystem
 }
 
-func NewPCMRecorder(audioSystem AudioSystem, interval int) *PCMRecorder {
+func NewPCMRecorder(audioSystem AudioSystem, baseDir string, interval int) *PCMRecorder {
 	var pr = &PCMRecorder{
+		BaseDir:              baseDir,
 		Interval:             interval,
 		recognitionStartTime: -1,
 		audioSystem:          audioSystem,
 	}
 	return pr
+}
+
+func (pr *PCMRecorder) GetDeviceInfo() {
+	pr.audioSystem.Initialize()
+	pr.audioSystem.GetDeviceInfo()
 }
 
 func (pr *PCMRecorder) Start(sig chan os.Signal, filepathCh chan string, wait *sync.WaitGroup) error {
@@ -65,6 +89,7 @@ func (pr *PCMRecorder) Start(sig chan os.Signal, filepathCh chan string, wait *s
 
 	var err error
 	stream, err := pr.initializeAudioStream()
+
 	if err != nil {
 		log.Fatalf("Could not open default stream \n %v", err)
 	}
@@ -81,27 +106,25 @@ loop:
 		default:
 		}
 
-		pr.processAudioInput(*stream, filepathCh)
+		pr.processAudioInput(stream, filepathCh)
 	}
 
 	return nil
 }
 
 func (pr *PCMRecorder) initializeAudioStream() (*AudioSystemStream, error) {
-	input := make([]int16, 64)
-	stream, err := pr.audioSystem.OpenDefaultStream(1, 0, 44100, len(input), input)
+	pr.Input = make([]int16, 64)
+	stream, err := pr.audioSystem.OpenDefaultStream(1, 0, 44100, len(pr.Input), pr.Input)
 	return &stream, err
 }
 
-func (pr *PCMRecorder) processAudioInput(stream AudioSystemStream, filePathCh chan string) {
-	input := make([]int16, 64)
-
-	if err := stream.Read(); err != nil {
+func (pr *PCMRecorder) processAudioInput(stream *AudioSystemStream, filePathCh chan string) {
+	if err := (*stream).Read(); err != nil {
 		log.Fatalf("Could not read stream\n%v", err)
 	}
 
-	if !pr.detectSilence(input) {
-		pr.record(input, stream.Time())
+	if !pr.detectSilence(pr.Input) {
+		pr.record(pr.Input, (*stream).Time())
 	} else {
 		pr.silentCount++
 	}
@@ -112,7 +135,7 @@ func (pr *PCMRecorder) processAudioInput(stream AudioSystemStream, filePathCh ch
 }
 
 func (pr *PCMRecorder) finalizeRecording(filepathCh chan string) {
-	outputFileName := fmt.Sprintf("_%d.wav", int(pr.recognitionStartTime))
+	outputFileName := fmt.Sprintf(pr.BaseDir+"_%d.wav", int(pr.recognitionStartTime))
 	fmt.Println(outputFileName)
 	pr.writePCMData(outputFileName, pr.BufferedContents)
 	filepathCh <- outputFileName
