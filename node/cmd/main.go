@@ -25,7 +25,7 @@ func main() {
 
 	baseDir := time.Now().Format("audio_20060102_T150405")
 	if err := os.MkdirAll(baseDir, 0755); err != nil {
-		panic("Could not create a new directory")
+		log.Fatal("Could not create a new directory")
 	}
 
 	audioSystem := &pcm.PortAudioSystem{}
@@ -61,8 +61,7 @@ func main() {
 
 	wavStream, err := client.StreamWav(context.Background())
 	if err != nil {
-		fmt.Println(err)
-		return
+		log.Fatal(err)
 	}
 
 	go func() {
@@ -73,12 +72,11 @@ func main() {
 			}
 			b, err := ioutil.ReadFile(filePath)
 			if err != nil {
-				panic(err)
+				log.Fatal(err)
 			}
 
 			if err := wavStream.Send(&transcriptorpb.WavChunk{Data: b}); err != nil {
-				fmt.Println(err)
-				return
+				log.Fatal(err)
 			}
 		}
 	}()
@@ -86,13 +84,10 @@ func main() {
 	<-sig
 	wait.Wait()
 
-	time.Sleep(1 * time.Second)
-
 	res, err := wavStream.CloseAndRecv()
 	if err != nil {
-		fmt.Println(err)
-	} else {
-		fmt.Println(res.GetDone())
+		log.Fatalf("Error closing and receiving StreamWav: %v", err)
 	}
+	fmt.Printf("Done: %v\n", res.GetDone())
 	fmt.Println("Streaming finished.")
 }
