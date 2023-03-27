@@ -70,7 +70,7 @@ func (t *transcriptionServer) StreamWav(stream transcriptorpb.TranscriptorServic
 }
 
 func GetTranscription(wavChank []byte) {
-	authToken := "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"
+	authToken := "sk-..."
 
 	var requestBody bytes.Buffer
 	writer := multipart.NewWriter(&requestBody)
