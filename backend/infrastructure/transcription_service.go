@@ -1,4 +1,4 @@
-package service
+package infrastructure
 
 import (
 	"bytes"
@@ -8,7 +8,6 @@ import (
 	"log"
 	"mime/multipart"
 	"net/http"
-	"os"
 	"time"
 
 	"github.com/joho/godotenv"
@@ -19,6 +18,10 @@ type ITranscriptionService interface {
 	Transcribe(wavData []byte) (model.Transcription, error)
 }
 
+type WhisperResponse struct {
+	Text string `json:"text"`
+}
+
 type HTTPClient interface {
 	Do(req *http.Request) (*http.Response, error)
 }
@@ -27,8 +30,10 @@ type WhisperTranscriptionService struct {
 	Client HTTPClient
 }
 
-type WhisperResponse struct {
-	Text string `json:"text"`
+func NewWhisperTranscriptionService(client HTTPClient) *WhisperTranscriptionService {
+	return &WhisperTranscriptionService{
+		Client: client,
+	}
 }
 
 func (wt *WhisperTranscriptionService) Transcribe(wavData []byte) (model.Transcription, error) {
@@ -69,10 +74,7 @@ func (wt *WhisperTranscriptionService) Transcribe(wavData []byte) (model.Transcr
 		log.Fatal(err)
 	}
 
-	// レスポンスを出力する
-	fmt.Println(whisperResponse.Text)
 	transcription.Text = whisperResponse.Text
-
 	return transcription, nil
 }
 
