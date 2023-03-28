@@ -8,15 +8,12 @@ import (
 	"log"
 	"mime/multipart"
 	"net/http"
+	"os"
 	"time"
 
 	"github.com/joho/godotenv"
 	"github.com/killinsun/go-meeting-transcriptor/backend/domain/model"
 )
-
-type ITranscriptionService interface {
-	Transcribe(wavData []byte) (model.Transcription, error)
-}
 
 type WhisperResponse struct {
 	Text string `json:"text"`
@@ -26,17 +23,17 @@ type HTTPClient interface {
 	Do(req *http.Request) (*http.Response, error)
 }
 
-type WhisperTranscriptionService struct {
+type WhisperTranscriptionProvider struct {
 	Client HTTPClient
 }
 
-func NewWhisperTranscriptionService(client HTTPClient) *WhisperTranscriptionService {
-	return &WhisperTranscriptionService{
+func NewWhisperTranscriptionProvider(client HTTPClient) *WhisperTranscriptionProvider {
+	return &WhisperTranscriptionProvider{
 		Client: client,
 	}
 }
 
-func (wt *WhisperTranscriptionService) Transcribe(wavData []byte) (model.Transcription, error) {
+func (wt *WhisperTranscriptionProvider) Transcribe(wavData []byte) (model.Transcription, error) {
 	transcription := model.Transcription{
 		Text:      "",
 		Timestamp: time.Now(),
@@ -78,7 +75,7 @@ func (wt *WhisperTranscriptionService) Transcribe(wavData []byte) (model.Transcr
 	return transcription, nil
 }
 
-func (wt *WhisperTranscriptionService) buildRequestBody(wavData []byte) (requestBody bytes.Buffer, contentType string, err error) {
+func (wt *WhisperTranscriptionProvider) buildRequestBody(wavData []byte) (requestBody bytes.Buffer, contentType string, err error) {
 	writer := multipart.NewWriter(&requestBody)
 	part, err := writer.CreateFormFile("file", "chank.wav")
 	if err != nil {

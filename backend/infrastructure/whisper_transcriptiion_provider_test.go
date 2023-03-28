@@ -29,7 +29,7 @@ func TestTranscribe(t *testing.T) {
 	t.Run("Should return Transcription struct", func(t *testing.T) {
 		want := model.Transcription{Text: "Hello World!"}
 
-		service := WhisperTranscriptionService{
+		service := WhisperTranscriptionProvider{
 			Client: mockHTTPClient,
 		}
 
@@ -40,8 +40,6 @@ func TestTranscribe(t *testing.T) {
 		}
 	})
 }
-
-type MockWhisperTranscriptionService struct{}
 
 type MockHTTPClient struct {
 	DoFunc func(req *http.Request) (*http.Response, error)

@@ -9,7 +9,7 @@ import (
 
 func GetTranscription(wavChank []byte) {
 	client := &http.Client{}
-	whisper := infrastructure.NewWhisperTranscriptionService(client)
+	whisper := infrastructure.NewWhisperTranscriptionProvider(client)
 
 	transcription, err := whisper.Transcribe(wavChank)
 	if err != nil {
