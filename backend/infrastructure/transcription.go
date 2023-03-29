@@ -38,7 +38,7 @@ func (t *RedisTranscriptionRepository) Read(ctx context.Context) (transcription 
 
 func (t *RedisTranscriptionRepository) Save(ctx context.Context, transcription model.Transcription) (err error) {
 	text := transcription.Text
-	err = t.redisClient.Set(ctx, t.redisKey, text, 0).Err()
+	err = t.redisClient.SAdd(ctx, t.redisKey, text, 0).Err()
 	if err != nil {
 		fmt.Println(err)
 		return err
