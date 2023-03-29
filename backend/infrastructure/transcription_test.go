@@ -26,19 +26,13 @@ func TestSave(t *testing.T) {
 
 		want := model.Transcription{Text: "Hello World!!"}
 		got, _, _ := r.SScan(ctx, key, 0, "", 100).Result()
-		if 0 < len(got) {
-			t.Errorf("\n got %v, \nwant %v", got, want)
-		}
+		assert(len(got), 0, t)
 
 		err := repository.Save(ctx, want)
-		if err != nil {
-			t.Errorf("Error: %v", err)
-		}
+		assertNil(err, t)
 
 		got, _, _ = r.SScan(ctx, key, 0, "", 100).Result()
-		if want.Text != got[1] {
-			t.Errorf("\n got %v, \nwant %v", got[1], want.Text)
-		}
+		assert(got[1], want.Text, t)
 	})
 
 	t.Run("supports multiple transcriptions with the same meeting id", func(t *testing.T) {
@@ -57,9 +51,7 @@ func TestSave(t *testing.T) {
 
 		got, _, _ := r.SScan(ctx, key, 0, "", 100).Result()
 		for i := 1; i < len(want)+1; i++ {
-			if got[i] != want[i-1].Text {
-				t.Errorf("\n got %v, \nwant %v", got[i], want[i-1].Text)
-			}
+			assert(got[i], want[i-1].Text, t)
 		}
 	})
 }
@@ -84,5 +76,16 @@ func initializeRedisStorage(r *redis.Client) {
 			break
 		}
 	}
+}
 
+func assert(got, want interface{}, t *testing.T) {
+	if got != want {
+		t.Errorf("\n got %v, \nwant %v", got, want)
+	}
+}
+
+func assertNil(got interface{}, t *testing.T) {
+	if got != nil {
+		t.Errorf("\n got %v", got)
+	}
 }
