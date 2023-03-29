@@ -9,8 +9,8 @@ import (
 )
 
 type RedisTranscriptionRepository struct {
-	redisClient *redis.Client
-	redisKey    string
+	redisClient    *redis.Client
+	redisKeyPrefix string
 }
 
 func NewRedisTranscriptionRepository(meetingId string) *RedisTranscriptionRepository {
@@ -20,13 +20,14 @@ func NewRedisTranscriptionRepository(meetingId string) *RedisTranscriptionReposi
 		DB:       0,
 	})
 	return &RedisTranscriptionRepository{
-		redisKey:    fmt.Sprintf("Transcription::%v", meetingId),
-		redisClient: redisClient,
+		redisKeyPrefix: fmt.Sprintf("Transcription:%v", meetingId),
+		redisClient:    redisClient,
 	}
 }
 
-func (t *RedisTranscriptionRepository) Read(ctx context.Context) (transcription model.Transcription, err error) {
-	result, err := t.redisClient.Get(ctx, t.redisKey).Result()
+func (t *RedisTranscriptionRepository) Read(ctx context.Context, id string) (transcription model.Transcription, err error) {
+	key := fmt.Sprintf("%v:%v", t.redisKeyPrefix, id)
+	result, err := t.redisClient.Get(ctx, key).Result()
 	if err != nil {
 		fmt.Println(err)
 		return model.Transcription{}, err
@@ -37,8 +38,15 @@ func (t *RedisTranscriptionRepository) Read(ctx context.Context) (transcription 
 }
 
 func (t *RedisTranscriptionRepository) Save(ctx context.Context, transcription model.Transcription) (err error) {
+	lastId, err := t.redisClient.Incr(ctx, t.redisKeyPrefix).Result()
+	if err != nil {
+		fmt.Println(err)
+		return err
+	}
+
+	key := t.redisKeyPrefix + ":" + fmt.Sprintf("%v", lastId)
 	text := transcription.Text
-	err = t.redisClient.SAdd(ctx, t.redisKey, text, 0).Err()
+	err = t.redisClient.Set(ctx, key, text, 0).Err()
 	if err != nil {
 		fmt.Println(err)
 		return err

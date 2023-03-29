@@ -9,7 +9,7 @@ import (
 	"golang.org/x/net/context"
 )
 
-func TestSave(t *testing.T) {
+func TestRead(t *testing.T) {
 	r := redis.NewClient(&redis.Options{
 		Addr:     "localhost:6379",
 		Password: "",
@@ -21,24 +21,49 @@ func TestSave(t *testing.T) {
 	t.Run("Should return Transcription struct", func(t *testing.T) {
 		ctx := context.Background()
 		meetingId := "meeting001"
-		key := fmt.Sprintf("Transcription::%v", meetingId)
+		key := fmt.Sprintf("Transcription:%v:1", meetingId)
+		want := model.Transcription{Text: "Hello"}
+		repository := NewRedisTranscriptionRepository(meetingId)
+
+		err := r.Set(ctx, key, want.Text, 0).Err()
+		assertNil(err, t)
+
+		got, err := repository.Read(ctx, "1")
+		assertNil(err, t)
+		assert(got.Text, want.Text, t)
+	})
+}
+
+func TestSave(t *testing.T) {
+	r := redis.NewClient(&redis.Options{
+		Addr:     "localhost:6379",
+		Password: "",
+		DB:       0,
+	})
+
+	initializeRedisStorage(r)
+
+	t.Run("Should add a new transcription", func(t *testing.T) {
+		ctx := context.Background()
+		meetingId := "meeting001"
+		lastId := "1"
+		key := fmt.Sprintf("Transcription:%v:%v", meetingId, lastId)
 		repository := NewRedisTranscriptionRepository(meetingId)
 
 		want := model.Transcription{Text: "Hello World!!"}
-		got, _, _ := r.SScan(ctx, key, 0, "", 100).Result()
-		assert(len(got), 0, t)
+		got, _ := r.Get(ctx, key).Result()
+		assert(got, "", t)
 
 		err := repository.Save(ctx, want)
 		assertNil(err, t)
 
-		got, _, _ = r.SScan(ctx, key, 0, "", 100).Result()
-		assert(got[1], want.Text, t)
+		got, _ = r.Get(ctx, key).Result()
+		assert(got, want.Text, t)
 	})
 
 	t.Run("supports multiple transcriptions with the same meeting id", func(t *testing.T) {
 		ctx := context.Background()
 		meetingId := "meeting002"
-		key := fmt.Sprintf("Transcription::%v", meetingId)
 		repository := NewRedisTranscriptionRepository(meetingId)
 
 		want := [...]model.Transcription{
@@ -49,9 +74,10 @@ func TestSave(t *testing.T) {
 		repository.Save(ctx, want[0])
 		repository.Save(ctx, want[1])
 
-		got, _, _ := r.SScan(ctx, key, 0, "", 100).Result()
 		for i := 1; i < len(want)+1; i++ {
-			assert(got[i], want[i-1].Text, t)
+			key := fmt.Sprintf("Transcription:%v:%v", meetingId, i)
+			got, _ := r.Get(ctx, key).Result()
+			assert(got, want[i-1].Text, t)
 		}
 	})
 }
@@ -63,7 +89,7 @@ func initializeRedisStorage(r *redis.Client) {
 	for {
 		var keys []string
 		var err error
-		keys, cursor, err = r.Scan(ctx, 0, "Transcription::*", 100).Result()
+		keys, cursor, err = r.Scan(ctx, 0, "Transcription:*", 100).Result()
 		if err != nil {
 			panic(err)
 		}
