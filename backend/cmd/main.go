@@ -7,12 +7,14 @@ import (
 	"io/ioutil"
 	"log"
 	"net"
+	"net/http"
 	"os"
 	"os/signal"
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/reflection"
 
+	"github.com/killinsun/go-meeting-transcriptor/backend/infrastructure"
 	transcriptorpb "github.com/killinsun/go-meeting-transcriptor/backend/pkg/grpc"
 	"github.com/killinsun/go-meeting-transcriptor/backend/usecase"
 )
@@ -63,6 +65,10 @@ func (t *transcriptionServer) StreamWav(stream transcriptorpb.TranscriptorServic
 			return err
 		}
 		ioutil.WriteFile("test.wav", req.GetData(), 0644)
-		usecase.GetTranscription(req.GetData())
+		client := http.Client{}
+		whisper := infrastructure.NewWhisperTranscriptionProvider(&client)
+		repo := infrastructure.NewRedisTranscriptionRepository("test")
+		transcriptionService := usecase.NewTranscriptionService(repo, whisper)
+		transcriptionService.GetTranscription(req.GetData())
 	}
 }

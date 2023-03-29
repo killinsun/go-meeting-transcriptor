@@ -4,14 +4,25 @@ import (
 	"fmt"
 	"net/http"
 
+	"github.com/killinsun/go-meeting-transcriptor/backend/domain/repository"
 	"github.com/killinsun/go-meeting-transcriptor/backend/infrastructure"
 )
 
-func GetTranscription(wavChank []byte) {
-	client := &http.Client{}
-	whisper := infrastructure.NewWhisperTranscriptionProvider(client)
+type TranscriptionService struct {
+	repo       repository.ITranscriptionRepository
+	provider   infrastructure.ITranscriptionProvider
+	httpclient *http.Client
+}
 
-	transcription, err := whisper.Transcribe(wavChank)
+func NewTranscriptionService(repo repository.ITranscriptionRepository, provider infrastructure.ITranscriptionProvider) *TranscriptionService {
+	return &TranscriptionService{
+		repo:     repo,
+		provider: provider,
+	}
+}
+
+func (t *TranscriptionService) GetTranscription(wavChank []byte) {
+	transcription, err := t.provider.Transcribe(wavChank)
 	if err != nil {
 		fmt.Printf("Error: %v", err)
 	}
